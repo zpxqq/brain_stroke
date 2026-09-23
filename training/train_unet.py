@@ -39,12 +39,12 @@ PATCH_SIZE = (
 
 
 TRAIN_CSV = (
-    "preprocessing/split_dataset/train.csv"
+    "split_dataset/train.csv"
 )
 
 
 VAL_CSV = (
-    "preprocessing/split_dataset/val.csv"
+    "split_dataset/val.csv"
 )
 
 
