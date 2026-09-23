@@ -48,9 +48,7 @@ VAL_CSV = (
 )
 
 
-MODEL_PATH = (
-    "weights/best_unet3d.pth"
-)
+MODEL_PATH = "/content/drive/MyDrive/stroke_project/models/best_unet3d.pth"
 
 
 

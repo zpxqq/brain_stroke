@@ -15,6 +15,9 @@ preprocessing/split_dataset/*.csv
 preprocessing/split_dataset/train/
 preprocessing/split_dataset/test/
 preprocessing/split_dataset/val/
+brain_stroke_MRI.zip
+brain_stroke_MRI/
+
 *.docx
 *.txt
 ~$*
