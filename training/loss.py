@@ -1,49 +1,95 @@
 import torch
 import torch.nn as nn
 
+from monai.losses import DiceLoss
 
 
-bce = nn.BCEWithLogitsLoss()
+class SegmentationLoss(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+        self.dice = DiceLoss(
+            sigmoid=True
+        )
+
+        self.bce = nn.BCEWithLogitsLoss()
+
+
+    def forward(self, prediction, target):
+
+        dice_loss = self.dice(
+            prediction,
+            target
+        )
+
+        bce_loss = self.bce(
+            prediction,
+            target
+        )
+
+        return dice_loss + bce_loss
 
 
 
-def dice_loss(pred, target):
+def dice_score(prediction, target, threshold=0.5):
 
-    pred = torch.sigmoid(pred)
+    prediction = torch.sigmoid(prediction)
 
-
-    smooth = 1
-
-
-    pred = pred.reshape(-1)
-    target = target.reshape(-1)
+    prediction = (
+        prediction > threshold
+    ).float()
 
 
     intersection = (
-        pred * target
+        prediction * target
     ).sum()
 
 
     dice = (
-        2 * intersection + smooth
-    ) / (
-        pred.sum()
+        2.0 * intersection
+        /
+        (
+            prediction.sum()
+            +
+            target.sum()
+            + 1e-8
+        )
+    )
+
+
+    return dice
+
+
+
+def iou_score(prediction, target, threshold=0.5):
+
+    prediction = torch.sigmoid(prediction)
+
+    prediction = (
+        prediction > threshold
+    ).float()
+
+
+    intersection = (
+        prediction * target
+    ).sum()
+
+
+    union = (
+        prediction.sum()
         +
         target.sum()
-        +
-        smooth
+        -
+        intersection
     )
 
 
-    return 1 - dice
-
-
-
-
-def combined_loss(pred, target):
-
-    return (
-        bce(pred, target)
-        +
-        dice_loss(pred, target)
+    iou = (
+        intersection
+        /
+        (union + 1e-8)
     )
+
+
+    return iou

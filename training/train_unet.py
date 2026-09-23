@@ -1,114 +1,161 @@
 import torch
-from torch.utils.data import DataLoader, random_split
 
-from dataset import ISLESDataset
-from loss import dice_loss
-from models.unet import UNet
-from training.loss import combined_loss
-device = "cuda" if torch.cuda.is_available() else "cpu"
-import os
+from torch.utils.data import DataLoader
 
-BASE_DIR = os.path.dirname(
-    os.path.dirname(
-        os.path.abspath(__file__)
-    )
+from monai.inferers import sliding_window_inference
+
+
+from datasets.mri_dataset import MRIDataset
+
+from models.unet3d import create_unet3d
+
+from training.loss import (
+    SegmentationLoss,
+    dice_score,
+    iou_score
 )
 
-WEIGHTS_PATH = os.path.join(
-    BASE_DIR,
-    "weights",
-    "unet_best.pth"
+
+
+# ==========================
+# настройки
+# ==========================
+
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+EPOCHS = 20
+
+BATCH_SIZE = 1
+
+LEARNING_RATE = 1e-4
+
+
+PATCH_SIZE = (
+    96,
+    96,
+    96
 )
 
-# =====================
+
+TRAIN_CSV = (
+    "preprocessing/split_dataset/train.csv"
+)
+
+
+VAL_CSV = (
+    "preprocessing/split_dataset/val.csv"
+)
+
+
+MODEL_PATH = (
+    "weights/best_unet3d.pth"
+)
+
+
+
+# ==========================
 # Dataset
-# =====================
+# ==========================
 
-dataset = ISLESDataset(
-    "C:/AI_brai/ISLES-2022"
+
+train_dataset = MRIDataset(
+    TRAIN_CSV,
+    train=True
 )
 
 
-train_size = int(len(dataset)*0.8)
-
-val_size = len(dataset)-train_size
-
-
-train_dataset, val_dataset = random_split(
-    dataset,
-    [train_size,val_size]
+val_dataset = MRIDataset(
+    VAL_CSV,
+    train=False
 )
 
 
 
 train_loader = DataLoader(
     train_dataset,
-    batch_size=2,
+    batch_size=BATCH_SIZE,
     shuffle=True
 )
 
 
+
 val_loader = DataLoader(
     val_dataset,
-    batch_size=2,
+    batch_size=1,
     shuffle=False
 )
 
 
 
-# =====================
-# Model
-# =====================
-
-model = UNet(
-    in_channels=3,
-    out_channels=1
-)
+# ==========================
+# model
+# ==========================
 
 
-model.to(device)
+model = create_unet3d()
+
+model.to(DEVICE)
 
 
 
-optimizer = torch.optim.Adam(
+criterion = SegmentationLoss()
+
+
+
+optimizer = torch.optim.AdamW(
     model.parameters(),
-    lr=0.0001
+    lr=LEARNING_RATE
 )
 
 
 
-# =====================
-# Training
-# =====================
-
-epochs = 20
-
-
-best_loss = 999
+best_dice = 0
 
 
 
-for epoch in range(epochs):
+# ==========================
+# обучение
+# ==========================
+
+
+for epoch in range(EPOCHS):
+
+
+    print(
+        f"\nEpoch {epoch+1}/{EPOCHS}"
+    )
+
+
+    # ----------------------
+    # TRAIN
+    # ----------------------
 
     model.train()
+
 
     train_loss = 0
 
 
-    for images, masks in train_loader:
+
+    for image, mask in train_loader:
 
 
-        images = images.to(device)
+        image = image.to(DEVICE)
 
-        masks = masks.to(device)
+        mask = mask.to(DEVICE)
 
 
-        prediction = model(images)
 
-        loss = combined_loss(
+        prediction = model(image)
+
+
+
+        loss = criterion(
             prediction,
-            masks
+            mask
         )
+
 
 
         optimizer.zero_grad()
@@ -116,6 +163,7 @@ for epoch in range(epochs):
         loss.backward()
 
         optimizer.step()
+
 
 
         train_loss += loss.item()
@@ -126,61 +174,136 @@ for epoch in range(epochs):
 
 
 
-    # =====================
-    # Validation
-    # =====================
+    print(
+        "Train loss:",
+        train_loss
+    )
+
+
+
+    # ----------------------
+    # VALIDATION
+    # ----------------------
 
     model.eval()
 
+
     val_loss = 0
+
+    val_dice = 0
+
+    val_iou = 0
+
 
 
     with torch.no_grad():
 
-        for images,masks in val_loader:
 
-            images = images.to(device)
-
-            masks = masks.to(device)
+        for image, mask in val_loader:
 
 
-            prediction = model(images)
+            image = image.to(DEVICE)
+
+            mask = mask.to(DEVICE)
 
 
-            loss = dice_loss(
-                prediction,
-                masks
+
+            # ВАЖНО:
+            # полный MRI проходит через sliding window
+
+
+            prediction = sliding_window_inference(
+
+                inputs=image,
+
+                roi_size=PATCH_SIZE,
+
+                sw_batch_size=1,
+
+                predictor=model
+
             )
+
+
+
+            loss = criterion(
+                prediction,
+                mask
+            )
+
 
 
             val_loss += loss.item()
 
 
 
+            val_dice += dice_score(
+                prediction,
+                mask
+            ).item()
+
+
+
+            val_iou += iou_score(
+                prediction,
+                mask
+            ).item()
+
+
+
     val_loss /= len(val_loader)
+
+    val_dice /= len(val_loader)
+
+    val_iou /= len(val_loader)
 
 
 
     print(
-        f"""
-Epoch {epoch+1}/{epochs}
-
-Train loss:
-{train_loss}
-
-Val loss:
-{val_loss}
-"""
+        "Val loss:",
+        val_loss
     )
 
 
-    if val_loss < best_loss:
+    print(
+        "Dice:",
+        val_dice
+    )
 
-        best_loss = val_loss
+
+    print(
+        "IoU:",
+        val_iou
+    )
+
+
+
+    # ----------------------
+    # сохраняем модель
+    # ----------------------
+
+
+    if val_dice > best_dice:
+
+
+        best_dice = val_dice
+
 
         torch.save(
             model.state_dict(),
-            WEIGHTS_PATH
+            MODEL_PATH
         )
 
-        print("Модель сохранена")
+
+        print(
+            "Сохранены лучшие веса"
+        )
+
+
+
+print("\nОбучение завершено")
+
+print(
+    "Лучший Dice:",
+    best_dice
+)

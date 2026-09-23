@@ -13,7 +13,8 @@ from monai.transforms import (
     RandFlipd,
     RandRotate90d,
     ConcatItemsd,
-    EnsureTyped
+    EnsureTyped,
+    SpatialPadd
 )
 
 
@@ -140,7 +141,18 @@ class MRIDataset(Dataset):
                 name="image",
 
                 dim=0
-            )
+            ),
+            SpatialPadd(
+                keys=[
+                    "image",
+                    "label"
+                ],
+                spatial_size=(
+                    96,
+                    96,
+                    96
+                )
+            ),
 
         ]
 
@@ -151,7 +163,6 @@ class MRIDataset(Dataset):
             transforms.append(
 
                 RandCropByPosNegLabeld(
-
                     keys=[
                         "image",
                         "label"
@@ -159,7 +170,11 @@ class MRIDataset(Dataset):
 
                     label_key="label",
 
-                    spatial_size=patch_size,
+                    spatial_size=(
+                        96,
+                        96,
+                        96
+                    ),
 
                     pos=1,
 
