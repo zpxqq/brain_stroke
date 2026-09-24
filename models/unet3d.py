@@ -4,43 +4,24 @@ from monai.networks.nets import UNet
 
 
 def create_unet3d():
-
-    model = UNet(
-
-        # 3D медицинские изображения
+    return UNet(
         spatial_dims=3,
-
-
-        # DWI + ADC + FLAIR
         in_channels=3,
-
-
-        # одна маска очага
         out_channels=1,
-
-
-        # количество каналов внутри сети
         channels=(
+            8,
             16,
             32,
             64,
-            128,
-            256
+            128
         ),
-
-
-        # уменьшение размера
         strides=(
             2,
             2,
             2,
             2
         ),
-
-
-        # дополнительные блоки
         num_res_units=2
-
     )
 
 
