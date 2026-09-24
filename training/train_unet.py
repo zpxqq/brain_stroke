@@ -24,7 +24,7 @@ from training.loss import (
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-EPOCHS = 20
+EPOCHS = 50
 
 BATCH_SIZE = 1
 
