@@ -16,7 +16,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-!pip install -q streamlit
+#!pip install -q streamlit
 
 # Commented out IPython magic to ensure Python compatibility.
 # %cd /content/brain_stroke
@@ -28,13 +28,13 @@ import requests
 from google.colab import drive
 drive.mount('/content/drive')
 
-!pkill -f streamlit || true
+#!pkill -f streamlit || true
 
-!nohup streamlit run /content/brain_stroke/app.py \
-    --server.address 0.0.0.0 \
-    --server.port 8501 \
-    --server.headless true \
-    > /content/streamlit.log 2>&1 &
+#!nohup streamlit run /content/brain_stroke/app.py \
+  #  --server.address 0.0.0.0 \
+  #  --server.port 8501 \
+  #  --server.headless true \
+  #  > /content/streamlit.log 2>&1 &
 
 import time
 import requests
