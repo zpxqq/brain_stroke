@@ -226,23 +226,26 @@ st.markdown(
 # ============================================================
 @st.cache_resource
 def load_model():
-    model_path = Path(MODEL_PATH)
-    if not model_path.exists():
-        raise FileNotFoundError(
-            f"Не найдены веса модели: {{MODEL_PATH}}. "
-            "Подключи Google Drive и проверь путь MODEL_PATH."
-        )
 
-    model = create_unet3d()
-    state_dict = torch.load(
-        MODEL_PATH,
-        map_location=DEVICE,
-        weights_only=True,
+    device = torch.device(
+        "cuda" if torch.cuda.is_available()
+        else "cpu"
     )
-    model.load_state_dict(state_dict)
-    model.to(DEVICE)
+
+    model = UNet()
+
+    checkpoint = torch.load(
+        "weights/unet_best.pth",
+        map_location=device
+    )
+
+    model.load_state_dict(checkpoint)
+
+    model.to(device)
+
     model.eval()
-    return model
+
+    return model, device
 
 
 # ============================================================
@@ -299,8 +302,10 @@ def predict(dwi_path, adc_path, flair_path):
     }}
     data = inference_transform(data)
 
-    image = data["image"].unsqueeze(0).to(DEVICE)
-    model = load_model()
+    image = image.to(device)
+
+    with torch.no_grad():
+        output = model(image)
 
     with torch.no_grad():
         logits = sliding_window_inference(

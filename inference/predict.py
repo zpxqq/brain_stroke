@@ -1,27 +1,37 @@
 import torch
 
-from models.unet import UNet
+from models.unet3d import create_unet3d
 
 
 
 def load_model(path):
 
-    model = UNet()
-
-    model.load_state_dict(
-        torch.load(path)
+    device = torch.device(
+        "cuda" if torch.cuda.is_available()
+        else "cpu"
     )
+
+    model = create_unet3d()
+
+    checkpoint = torch.load(
+        path,
+        map_location=device
+    )
+
+    model.load_state_dict(checkpoint)
+
+    model.to(device)
 
     model.eval()
 
-    return model
-
+    return model, device
 
 
 
 def predict(
         model,
-        image
+        image,
+        device
 ):
 
     image = torch.tensor(
@@ -29,8 +39,11 @@ def predict(
         dtype=torch.float32
     )
 
-
+    # добавляем batch dimension
     image = image.unsqueeze(0)
+
+    # отправляем на GPU
+    image = image.to(device)
 
 
     with torch.no_grad():
@@ -38,17 +51,17 @@ def predict(
         pred = model(image)
 
 
+    probability = (
+        torch.sigmoid(pred)
+        .squeeze()
+        .cpu()
+        .numpy()
+    )
+
+
     mask = (
-        pred.squeeze()
-        .numpy()
-        >0.5
+        probability > 0.5
     )
 
 
-    confidence = (
-        pred.squeeze()
-        .numpy()
-    )
-
-
-    return mask, confidence
+    return mask, probability

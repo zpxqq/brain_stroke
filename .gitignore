@@ -1,6 +1,7 @@
 ISLES-2022/
 
 .venv/
+.venv_cuda/
 
 weights/
 *.pth
